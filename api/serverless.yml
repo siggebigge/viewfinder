@@ -1,0 +1,44 @@
+service: viewfinder-api-service
+
+provider:
+  name: aws
+  runtime: python3.6
+  stage: "dev"
+  region: "eu-north-1"
+  deploymentBucket: "vf-deploy"
+
+  vpc:
+    subnetIds:
+      Fn::Split:
+        - ','
+        - Fn::ImportValue: "Viewfinder-Subnets-${self:provider.stage}"
+    securityGroupIds:
+      - Fn::ImportValue: "Viewfinder-Default-SG-${self:provider.stage}"
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    dockerFile: ../Dockerfile
+
+# Packaging information
+package:
+  include:
+    - ../api/*
+  exclude:
+    - .serverless/*
+    - requirements.txt
+    - serverless.yml
+    - package.json
+    - package-lock.json
+    - node_modules/**
+
+functions:
+  dummy:
+    handler: handler.dummy
+    events:
+      - http:
+          path: dummy
+          method: get
+
+plugins:
+  - serverless-python-requirements
