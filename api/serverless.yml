@@ -24,6 +24,7 @@ custom:
 package:
   include:
     - ../api/*
+    - ../analysis/*
   exclude:
     - .serverless/*
     - requirements.txt
@@ -39,6 +40,12 @@ functions:
       - http:
           path: dummy
           method: get
+  analyzeImage:
+    handler: handler.analyze_image
+    events:
+      - http:
+          path: analyzeImage
+          method: post
 
 plugins:
   - serverless-python-requirements
