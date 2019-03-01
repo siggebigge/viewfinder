@@ -46,6 +46,12 @@ functions:
       - http:
           path: analyzeImage
           method: post
+  analyzeImages:
+    handler: handler.analyze_images
+    events:
+    - http:
+        path: analyzeImages
+        method: post
 
 plugins:
   - serverless-python-requirements

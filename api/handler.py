@@ -1,3 +1,5 @@
+import json
+
 from analysis import image_analyzer
 
 
@@ -9,12 +11,24 @@ def dummy(event, context):
 
 
 def analyze_image(event, context):
-    body = event['body']
-    print(body.keys())
-    if 'images' not in body:
+    body = json.loads(event['body'])
+    if 'image' not in body:
         return {"statusCode": 400,
                 "body": "Missing arguments"}
     
+    result = image_analyzer.read_image(body['image'])
+    return {
+        "statusCode": 200,
+        "body": result
+    }
+
+
+def analyze_images(event, context):
+    body = json.loads(event['body'])
+    if 'images' not in body:
+        return {"statusCode": 400,
+                "body": "Missing arguments"}
+
     result = image_analyzer.read_images(body['images'])
     return {
         "statusCode": 200,

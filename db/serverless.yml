@@ -1,0 +1,123 @@
+service: viewfinder-database-service
+
+provider:
+  name: aws
+  runtime: python3.6
+  stage: "dev"
+  region: "eu-north-1"
+  config: "../config.json"
+  deploymentBucket: "vf-deploy"
+  environment:
+    DBName: "${file(${self:provider.config}):database.name}"
+    Port: "${file(${self:provider.config}):database.port}"
+    Username: "${file(${self:provider.config}):database.user}"
+    Password: "${file(${self:provider.config}):database.password}"
+    AvailabilityZone: "${file(${self:provider.config}):database.availability_zone}"
+    Engine: "mysql"
+    DBInstanceClass: "db.t3.micro"
+    VpcId:
+      Fn::ImportValue: "Viewfinder-VPC-${self:provider.stage}"
+    VpcSubnets:
+      Fn::Split:
+      - ','
+      - Fn::ImportValue: "Viewfinder-Subnets-${self:provider.stage}"
+
+resources:
+  Conditions:
+    DevStageCondition:
+      Fn::Equals:
+      - "dev"
+      - "${self:provider.stage}"
+  Resources:
+    RDSAccessGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: A resource (e.g. Lambda) must belong to this group if it want access to the RDS.
+        SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow traffic from all sources.
+          IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+        SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow traffic to all sources.
+          IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+        Tags:
+        - Key: Name
+          Value: RDS Access
+        VpcId: "${self:provider.environment.VpcId}"
+
+    RDSSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: The RDS belongs to this security group.
+        SecurityGroupIngress:
+        - Description: Allow only traffic from resources that belong to RDSAccess group.
+          SourceSecurityGroupId:
+            Ref: RDSAccessGroup
+          IpProtocol: tcp
+          FromPort: "${self:provider.environment.Port}"
+          ToPort: "${self:provider.environment.Port}"
+        Tags:
+        - Key: Name
+          Value: RDS
+        VpcId: "${self:provider.environment.VpcId}"
+
+    DBSubnetGroup:
+      Type: AWS::RDS::DBSubnetGroup
+      Properties:
+        DBSubnetGroupDescription: This group consists of two subnets spread over two AZ
+        SubnetIds: "${self:provider.environment.VpcSubnets}"
+        Tags:
+        - Key: Name
+          Value: "${self:provider.stage} RDS Subnet Group"
+
+    RDS:
+      Type: AWS::RDS::DBInstance
+      Properties:
+        AllocatedStorage: 20 # GB
+        AutoMinorVersionUpgrade: True
+        BackupRetentionPeriod: 7 # Days
+        DBInstanceClass: "${self:provider.environment.DBInstanceClass}"
+        DBName: "${self:provider.environment.DBName}"
+        DBSubnetGroupName:
+          Ref: DBSubnetGroup
+        Engine: "${self:provider.environment.Engine}"
+        MasterUsername: "${self:provider.environment.Username}"
+        MasterUserPassword: "${self:provider.environment.Password}"
+        MultiAZ: False
+        Port: "${self:provider.environment.Port}"
+        PubliclyAccessible:
+          Fn::If:
+          - DevStageCondition
+          - True
+          - False
+        StorageType: standard
+        Tags:
+        - Key: Name
+          Value: Viewfinder
+        VPCSecurityGroups:
+        - Ref: RDSSecurityGroup
+
+  Outputs:
+    RdsId:
+      Description: A reference to the RDS.
+      Value:
+        Ref: RDS
+
+    RDSAccessGroup:
+      Description: A reference to the security group that gives access to the RDS.
+      Value:
+        Ref: RDSAccessGroup
+      Export:
+        Name: "RDSAccessGroup-${self:provider.stage}"
+
+    HostName:
+      Description: The hostname of the RDS instance
+      Value:
+        Fn::GetAtt: [RDS, Endpoint.Address]
+      Export:
+        Name: "DatabaseHostName-${self:provider.stage}"

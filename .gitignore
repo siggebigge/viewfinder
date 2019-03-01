@@ -1,6 +1,7 @@
 # Distribution / packaging
 .Python
 env/
+venv/
 build/
 develop-eggs/
 dist/
@@ -21,3 +22,15 @@ var/
 
 .DS_Store
 .idea
+api/__pycache__
+db/__pycache__
+
+#config
+config.json
+
+# Node
+node_modules/
+package-lock.json
+
+#Local files
+local_test.py
